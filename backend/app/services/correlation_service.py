@@ -17,7 +17,7 @@ except ImportError:
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+DATA_DIR = Path(__file__).resolve().parents[3] / "data"
 COMBINED_CSV = DATA_DIR / "combined_dataset.csv"
 
 
