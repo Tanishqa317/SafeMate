@@ -1,24 +1,33 @@
-import Dashboard from './components/Dashboard'
-import SwissCheese from './components/SwissCheese'
-import ReplayEngine from './components/ReplayEngine'
-import EvacMap from './components/EvacMap'
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Layout from './components/Layout';
+import CoreVitals from './pages/CoreVitals';
+import VibrationDNA from './pages/VibrationDNA';
+import SwissCheese from './pages/SwissCheese';
+import Replay from './pages/Replay';
+import OracleSwarm from './pages/OracleSwarm';
+import Evacuation from './pages/Evacuation';
+import AlarmFatigue from './pages/AlarmFatigue';
+import EvidenceChain from './pages/EvidenceChain';
+import Compliance from './pages/Compliance';
 
 function App() {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      <header className="mb-8">
-        <h1 className="text-4xl font-bold">Risk Dashboard</h1>
-        <p className="text-slate-400 mt-2">Starter UI for risk monitoring and evacuation planning.</p>
-      </header>
-
-      <main className="grid gap-6 md:grid-cols-2">
-        <Dashboard />
-        <SwissCheese />
-        <ReplayEngine />
-        <EvacMap />
-      </main>
-    </div>
-  )
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<CoreVitals />} />
+          <Route path="/vibration-dna" element={<VibrationDNA />} />
+          <Route path="/swiss-cheese" element={<SwissCheese />} />
+          <Route path="/replay" element={<Replay />} />
+          <Route path="/oracle-swarm" element={<OracleSwarm />} />
+          <Route path="/evacuation" element={<Evacuation />} />
+          <Route path="/alarm-fatigue" element={<AlarmFatigue />} />
+          <Route path="/evidence-chain" element={<EvidenceChain />} />
+          <Route path="/compliance" element={<Compliance />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
