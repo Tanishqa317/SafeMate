@@ -73,9 +73,10 @@ export default function OracleSwarm() {
     return () => clearInterval(id);
   }, [data]);
 
-  const hh = String(Math.floor(remaining / 3600)).padStart(2, '0');
-  const mm = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
-  const ss = String(remaining % 60).padStart(2, '0');
+  const hasCountdown = data?.countdown_seconds != null;
+  const hh = hasCountdown ? String(Math.floor(remaining / 3600)).padStart(2, '0') : '--';
+  const mm = hasCountdown ? String(Math.floor((remaining % 3600) / 60)).padStart(2, '0') : '--';
+  const ss = hasCountdown ? String(remaining % 60).padStart(2, '0') : '--';
 
   const consensus = data?.consensus;
   const consensusColor = consensus?.consensus ? '#ff1e56' : '#00ffaa';
