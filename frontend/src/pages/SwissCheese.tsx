@@ -1,27 +1,84 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '../components/PageHeader';
-import { Layers3, AlertTriangle, Radar, ShieldX } from 'lucide-react';
+import { Layers3, AlertTriangle, Radar, ShieldX, RefreshCw } from 'lucide-react';
+
+const API_BASE = 'http://127.0.0.1:8000/api';
+const UNIT_ID = 'unit-1'; // TODO: wire to global unit selector if/when one exists
 
 type Layer = {
   id: string;
   name: string;
   desc: string;
   failed: boolean;
+  source: 'live' | 'static'; // static = no backend endpoint exists yet
 };
 
 const initial: Layer[] = [
-  { id: 'L1', name: 'Sensors', desc: 'IoT telemetry · 2,048 nodes', failed: false },
-  { id: 'L2', name: 'Digital Permits', desc: 'Lockout/Tagout · e-permit chain', failed: false },
-  { id: 'L3', name: 'Neuro-Symbolic Guardrails', desc: 'Adversarial permit-gaming detector', failed: false },
-  { id: 'L4', name: 'Operations Staffing', desc: 'Shift coverage · 12 operators', failed: false },
+  { id: 'L1', name: 'Sensors', desc: 'IoT telemetry · 2,048 nodes', failed: false, source: 'static' },
+  { id: 'L2', name: 'Digital Permits', desc: 'Lockout/Tagout · e-permit chain', failed: false, source: 'live' },
+  { id: 'L3', name: 'Neuro-Symbolic Guardrails', desc: 'Adversarial permit-gaming detector', failed: false, source: 'live' },
+  { id: 'L4', name: 'Operations Staffing', desc: 'Shift coverage · 12 operators', failed: false, source: 'static' },
 ];
 
 export default function SwissCheese() {
   const [layers, setLayers] = useState<Layer[]>(initial);
   const [alarm, setAlarm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const failedCount = layers.filter((l) => l.failed).length;
+
+  const fetchLiveLayers = useCallback(async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const [permitRes, guardrailRes] = await Promise.all([
+        fetch(`${API_BASE}/permit-gaming-check/demo/${UNIT_ID}`),
+        fetch(`${API_BASE}/guardrail-check/demo/${UNIT_ID}`),
+      ]);
+
+      if (!permitRes.ok || !guardrailRes.ok) {
+        throw new Error(`Backend returned ${permitRes.status}/${guardrailRes.status}`);
+      }
+
+      const permitData = await permitRes.json();
+      const guardrailData = await guardrailRes.json();
+
+      const permitFailed: boolean = !!permitData?.result?.suspicious;
+      const permitDesc: string =
+        permitData?.result?.reason || 'Lockout/Tagout · e-permit chain';
+
+      // guardrail-check has no boolean field — derive failed state from a non-empty flagged_zone.
+      // NOTE: while Gemini is returning 403s, this will fall back to risk_score 50 / flagged_zone ""
+      // (i.e. always reads as ACTIVE) until the API key issue is resolved.
+      const guardrailZone: string = guardrailData?.guardrail_result?.flagged_zone || '';
+      const guardrailFailed: boolean = guardrailZone !== '';
+      const guardrailReasoning: string = guardrailData?.guardrail_result?.reasoning || '';
+      const guardrailIsGeminiError = guardrailReasoning.includes('Gemini API call failed');
+      const guardrailDesc = guardrailIsGeminiError
+        ? 'Adversarial permit-gaming detector · Gemini unavailable, using fallback'
+        : guardrailReasoning || 'Adversarial permit-gaming detector';
+
+      setLayers((prev) =>
+        prev.map((l) => {
+          if (l.id === 'L2') return { ...l, failed: permitFailed, desc: permitDesc };
+          if (l.id === 'L3') return { ...l, failed: guardrailFailed, desc: guardrailDesc };
+          return l;
+        }),
+      );
+      setLastUpdated(new Date());
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'Failed to reach backend');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLiveLayers(); // one-time load on mount — no auto-polling, per quota protection rule
+  }, [fetchLiveLayers]);
 
   useEffect(() => {
     setAlarm(failedCount >= 3);
@@ -49,12 +106,9 @@ export default function SwissCheese() {
       const h = canvas.clientHeight;
       ctx.clearRect(0, 0, w, h);
 
-      // Wireframe plant blueprint
       ctx.strokeStyle = 'rgba(0,255,170,0.18)';
       ctx.lineWidth = 1;
-      // Outer wall
       ctx.strokeRect(40, 40, w - 80, h - 80);
-      // Inner rooms
       const cols = 4, rows = 3;
       const cw = (w - 80) / cols;
       const ch = (h - 80) / rows;
@@ -70,7 +124,6 @@ export default function SwissCheese() {
         ctx.lineTo(w - 40, 40 + ch * i);
         ctx.stroke();
       }
-      // Diagonal pipes
       ctx.strokeStyle = 'rgba(0,255,170,0.08)';
       for (let i = 0; i < 6; i++) {
         ctx.beginPath();
@@ -79,7 +132,6 @@ export default function SwissCheese() {
         ctx.stroke();
       }
 
-      // Volumetric risk fog in failed zones
       const dangerZones = [
         { x: 0.25, y: 0.35 },
         { x: 0.7, y: 0.6 },
@@ -100,7 +152,6 @@ export default function SwissCheese() {
         ctx.fill();
       });
 
-      // Scan line
       const scanY = (Math.sin(t * 0.3) * 0.5 + 0.5) * h;
       const scanGrad = ctx.createLinearGradient(0, scanY - 30, 0, scanY + 30);
       scanGrad.addColorStop(0, 'rgba(0,255,170,0)');
@@ -127,6 +178,17 @@ export default function SwissCheese() {
         subtitle="3D risk fog volumetric over plant blueprint — toggle defense barriers to expose co-alignment vectors."
         right={
           <div className="flex items-center gap-3">
+            <button
+              onClick={fetchLiveLayers}
+              disabled={loading}
+              className="glass rounded-md px-3 py-2 flex items-center gap-2 hover:bg-white/5 disabled:opacity-50"
+              title="Refresh live layers (Permits + Guardrails)"
+            >
+              <RefreshCw size={12} className={`text-mint ${loading ? 'animate-spin' : ''}`} />
+              <span className="hud-mono text-[9px] text-slate-400">
+                {loading ? 'REFRESHING' : lastUpdated ? `UPD ${lastUpdated.toLocaleTimeString()}` : 'REFRESH'}
+              </span>
+            </button>
             <div className="glass rounded-md px-4 py-2">
               <div className="hud-label">LAYERS FAILED</div>
               <div
@@ -140,6 +202,12 @@ export default function SwissCheese() {
           </div>
         }
       />
+
+      {fetchError && (
+        <div className="mb-3 glass rounded-md border border-amber-cyber/30 px-4 py-2 hud-mono text-[10px] text-amber-cyber">
+          BACKEND UNREACHABLE · {fetchError} · Permits/Guardrails showing last known state
+        </div>
+      )}
 
       <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-10">
         <div className="glass relative overflow-hidden rounded-lg lg:col-span-7">
@@ -156,16 +224,19 @@ export default function SwissCheese() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 overflow-y-auto lg:col-span-3">
+        <div className="flex flex-col gap-3 overflow-y-auto lg:col-span-3 pr-1">
           {layers.map((l, idx) => (
             <LayerCard
               key={l.id}
               layer={l}
               index={idx}
-              onToggle={() =>
-                setLayers((prev) =>
-                  prev.map((p) => (p.id === l.id ? { ...p, failed: !p.failed } : p)),
-                )
+              onToggle={
+                l.source === 'static'
+                  ? () =>
+                      setLayers((prev) =>
+                        prev.map((p) => (p.id === l.id ? { ...p, failed: !p.failed } : p)),
+                      )
+                  : undefined
               }
             />
           ))}
@@ -218,14 +289,14 @@ function LayerCard({
 }: {
   layer: Layer;
   index: number;
-  onToggle: () => void;
+  onToggle?: () => void;
 }) {
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ stiffness: 100, damping: 15, delay: index * 0.08 }}
-      className={`glass glass-hover relative overflow-hidden rounded-lg p-4 ${
+      className={`glass glass-hover relative overflow-visible rounded-lg p-4 ${
         layer.failed ? 'border-crimson-vitals/30' : ''
       }`}
     >
@@ -242,7 +313,7 @@ function LayerCard({
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 flex items-center justify-between">
+      <div className="relative z-10 flex items-start justify-between gap-2">
         <div className="flex items-center gap-3">
           <div
             className={`flex h-8 w-8 items-center justify-center rounded border ${
@@ -257,31 +328,35 @@ function LayerCard({
               <Layers3 size={14} className="text-mint glow-mint" />
             )}
           </div>
-          <div>
+          <div className="min-w-0 flex-1 pr-2">
             <div className="font-display text-[13px] font-medium text-white">{layer.name}</div>
-            <div className="hud-mono text-[9px] tracking-wider text-slate-500">{layer.desc}</div>
+            <div className="hud-mono text-[9px] tracking-wider text-slate-500 leading-relaxed">{layer.desc}</div>
           </div>
         </div>
 
-        <button
-          onClick={onToggle}
-          className={`relative h-6 w-12 rounded-full transition-colors ${
-            layer.failed ? 'bg-crimson-vitals/30' : 'bg-mint/20'
-          }`}
-        >
-          <motion.span
-            layout
-            transition={{ stiffness: 100, damping: 15 }}
-            className="absolute top-1 h-4 w-4 rounded-full"
-            style={{
-              left: layer.failed ? 'calc(100% - 20px)' : '4px',
-              background: layer.failed ? '#ff1e56' : '#00ffaa',
-              boxShadow: layer.failed
-                ? '0 0 10px rgba(255,30,86,0.8)'
-                : '0 0 10px rgba(0,255,170,0.8)',
-            }}
-          />
-        </button>
+        {onToggle ? (
+          <button
+            onClick={onToggle}
+            className={`relative h-6 w-12 rounded-full transition-colors ${
+              layer.failed ? 'bg-crimson-vitals/30' : 'bg-mint/20'
+            }`}
+          >
+            <motion.span
+              layout
+              transition={{ stiffness: 100, damping: 15 }}
+              className="absolute top-1 h-4 w-4 rounded-full"
+              style={{
+                left: layer.failed ? 'calc(100% - 20px)' : '4px',
+                background: layer.failed ? '#ff1e56' : '#00ffaa',
+                boxShadow: layer.failed
+                  ? '0 0 10px rgba(255,30,86,0.8)'
+                  : '0 0 10px rgba(0,255,170,0.8)',
+              }}
+            />
+          </button>
+        ) : (
+          <div className="hud-mono text-[8px] text-slate-600 tracking-wider">LIVE</div>
+        )}
       </div>
       <div className="relative z-10 mt-2 hud-mono text-[9px] tracking-wider">
         <span className={layer.failed ? 'text-crimson-vitals glow-crimson' : 'text-mint glow-mint'}>
