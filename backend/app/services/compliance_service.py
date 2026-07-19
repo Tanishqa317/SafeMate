@@ -1,9 +1,23 @@
 import json
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
 from pathlib import Path
 from dotenv import load_dotenv
+
+FALLBACK_FILE = Path(__file__).resolve().parents[2] / "data" / "fallback_responses.json"
+
+
+def _load_fallback_compliance(unit_id: str) -> Optional[Dict]:
+    """Return a previously-captured real compliance_audit for this unit, if any."""
+    if not FALLBACK_FILE.exists():
+        return None
+    try:
+        with FALLBACK_FILE.open("r", encoding="utf-8") as fh:
+            fallbacks = json.load(fh)
+        return fallbacks.get(unit_id, {}).get("compliance_audit")
+    except Exception:
+        return None
 
 try:
     from google import genai
@@ -97,6 +111,12 @@ def audit_unit_compliance(unit_id: str) -> Dict:
     """Audit a unit's compliance against regulatory standards."""
 
     if not GEMINI_AVAILABLE or not GEMINI_API_KEY:
+        fallback = _load_fallback_compliance(unit_id)
+        if fallback is not None:
+            result = dict(fallback)
+            result["error"] = None
+            result["fallback_used"] = True
+            return result
         return {
             "unit_id": unit_id,
             "compliance_status": "unknown",
@@ -104,6 +124,7 @@ def audit_unit_compliance(unit_id: str) -> Dict:
             "corrective_actions": [],
             "regulatory_references": [],
             "error": "Gemini API not available",
+            "fallback_used": False,
         }
 
     try:
@@ -151,7 +172,7 @@ Please audit this unit's compliance against the provided regulatory standards.
 """
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-flash-latest",
             contents=[{"role": "user", "parts": [{"text": user_content}]}],
             config={
                 "system_instruction": system_prompt,
@@ -176,9 +197,16 @@ Please audit this unit's compliance against the provided regulatory standards.
             "corrective_actions": result.get("corrective_actions", []),
             "regulatory_references": result.get("regulatory_references", []),
             "current_state_summary": state_summary,
+            "fallback_used": False,
         }
 
     except json.JSONDecodeError as e:
+        fallback = _load_fallback_compliance(unit_id)
+        if fallback is not None:
+            result = dict(fallback)
+            result["error"] = None
+            result["fallback_used"] = True
+            return result
         return {
             "unit_id": unit_id,
             "compliance_status": "unknown",
@@ -186,8 +214,15 @@ Please audit this unit's compliance against the provided regulatory standards.
             "corrective_actions": [],
             "regulatory_references": [],
             "error": f"Failed to parse Gemini response: {str(e)}",
+            "fallback_used": False,
         }
     except Exception as e:
+        fallback = _load_fallback_compliance(unit_id)
+        if fallback is not None:
+            result = dict(fallback)
+            result["error"] = None
+            result["fallback_used"] = True
+            return result
         return {
             "unit_id": unit_id,
             "compliance_status": "unknown",
@@ -195,4 +230,5 @@ Please audit this unit's compliance against the provided regulatory standards.
             "corrective_actions": [],
             "regulatory_references": [],
             "error": str(e),
+            "fallback_used": False,
         }

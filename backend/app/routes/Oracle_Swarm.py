@@ -72,7 +72,7 @@ def _call_oracle_agent(plant_state: Dict[str, Any], agent_name: str, system_inst
         )
 
         response: Any = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-flash-latest",
             contents=[{"role": "user", "parts": [{"text": user_content}]}],
             config=types.GenerateContentConfig(  # type: ignore[attr-defined]
                 system_instruction=system_instruction,

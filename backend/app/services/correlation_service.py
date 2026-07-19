@@ -18,13 +18,26 @@ except ImportError:
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 COMBINED_CSV = DATA_DIR / "combined_dataset.csv"
+FALLBACK_FILE = DATA_DIR / "fallback_responses.json"
 
 # --- Simple in-memory cache to avoid burning Gemini quota ---
 # Keyed by unit_id -> {"result": {...}, "cached_at": epoch_seconds}
 _RISK_CACHE: Dict[str, Dict] = {}
 CACHE_TTL_SECONDS = 1800  # 30 minutes — tune this up if quota is still tight
+
+
+def _load_fallback_risk_assessment(unit_id: str) -> Optional[Dict]:
+    """Return a previously-captured real risk_assessment for this unit, if any."""
+    if not FALLBACK_FILE.exists():
+        return None
+    try:
+        with FALLBACK_FILE.open("r", encoding="utf-8") as fh:
+            fallbacks = json.load(fh)
+        return fallbacks.get(unit_id, {}).get("risk_assessment")
+    except Exception:
+        return None
 
 
 def build_context(unit_id: str) -> Dict:
@@ -111,7 +124,7 @@ def call_gemini_for_risk_score(context: Dict) -> Dict:
         user_content = f"Analyze this plant unit data for risk: {json.dumps(context)}"
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-flash-latest",
             contents=[
                 {
                     "role": "user",
@@ -193,5 +206,19 @@ def get_risk_assessment(unit_id: str, force_refresh: bool = False) -> Dict:
         result = dict(result)
         result["cached"] = False
         result["cache_age_seconds"] = 0
+        result["fallback_used"] = False
+        return result
 
+    # Gemini failed — serve a previously-captured real response if we have one,
+    # instead of showing the raw API error to the user.
+    fallback = _load_fallback_risk_assessment(unit_id)
+    if fallback is not None:
+        fallback_result = dict(fallback)
+        fallback_result["error"] = None
+        fallback_result["cached"] = True
+        fallback_result["cache_age_seconds"] = 0
+        fallback_result["fallback_used"] = True
+        return fallback_result
+
+    result["fallback_used"] = False
     return result

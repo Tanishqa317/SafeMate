@@ -1,0 +1,119 @@
+{
+  "unit-1": {
+    "risk_assessment": {
+      "unit_id": "unit-1",
+      "risk_score": 75,
+      "risk_level": "high",
+      "primary_concern": "Rapid tool wear and permit backlog",
+      "reasoning": "The tool wear metric is increasing rapidly, rising from 0 to 30 in just 40 minutes, indicating accelerating mechanical stress. Furthermore, the extremely high number of active and expired permits suggests a significant administrative backlog and heightened operational risk. While core temperatures and rotational speeds are currently stable, proactive maintenance and permit reconciliation are recommended.",
+      "error": null,
+      "cached": false,
+      "cache_age_seconds": 0
+    },
+    "guardrail_check": {
+      "unit_id": "unit-1",
+      "plant_state": {
+        "zones": [
+          {
+            "zone_id": "unit-1-zone-1",
+            "gas_ppm": 250.0,
+            "active_permits": [],
+            "supervisors_present": 2
+          },
+          {
+            "zone_id": "unit-1-zone-2",
+            "gas_ppm": 250.0,
+            "active_permits": [],
+            "supervisors_present": 2
+          },
+          {
+            "zone_id": "unit-1-zone-3",
+            "gas_ppm": 250.0,
+            "active_permits": [],
+            "supervisors_present": 2
+          }
+        ]
+      },
+      "engine_output": {
+        "risk_score": 75,
+        "flagged_zone": "",
+        "reasoning": "The tool wear metric is increasing rapidly, rising from 0 to 30 in just 40 minutes, indicating accelerating mechanical stress. Furthermore, the extremely high number of active and expired permits suggests a significant administrative backlog and heightened operational risk. While core temperatures and rotational speeds are currently stable, proactive maintenance and permit reconciliation are recommended.",
+        "contributing_factors": []
+      },
+      "guardrail_result": {
+        "risk_score": 75,
+        "flagged_zone": "",
+        "reasoning": "The tool wear metric is increasing rapidly, rising from 0 to 30 in just 40 minutes, indicating accelerating mechanical stress. Furthermore, the extremely high number of active and expired permits suggests a significant administrative backlog and heightened operational risk. While core temperatures and rotational speeds are currently stable, proactive maintenance and permit reconciliation are recommended.",
+        "contributing_factors": [],
+        "overridden": false,
+        "override_reason": null
+      }
+    },
+    "compliance_audit": {
+      "unit_id": "unit-1",
+      "compliance_status": "minor_deviation",
+      "deviations_found": [
+        "Permit registry includes permits with 'expired' and 'revoked' statuses within active operational tracking."
+      ],
+      "corrective_actions": [
+        "Perform an immediate audit of all 1,973 permits to isolate and archive expired and revoked entries.",
+        "Verify that no operations are currently being conducted under the authority of any expired or revoked permits."
+      ],
+      "regulatory_references": [
+        "Standard Permit Administration and Tracking Guidelines"
+      ],
+      "current_state_summary": "\nUnit ID: unit-1\nActive Permits: 1973 permits\n  - Types: general\n  - Statuses: active, expired, revoked\nShift Staffing: normal\nGuardrail Violations: 0 found\n  - None\nRecent Alarms (Last Hour): 3\n"
+    }
+  },
+  "unit-2": {
+    "risk_assessment": {
+      "unit_id": "unit-2",
+      "risk_score": 30,
+      "risk_level": "low",
+      "primary_concern": "Accelerated post-replacement tool wear",
+      "reasoning": "The unit's tool wear was recently resolved by a maintenance event, dropping from a critical value of 213.0 to 3.0. However, the tool wear has since risen relatively quickly to 25.0 within 30 minutes, which warrants close monitoring. All other parameters, including temperature and torque, remain stable under normal staffing conditions.",
+      "error": null,
+      "cached": false,
+      "cache_age_seconds": 0
+    },
+    "guardrail_check": {
+      "unit_id": "unit-2",
+      "plant_state": {
+        "zones": [
+          {
+            "zone_id": "unit-2-zone-1",
+            "gas_ppm": 250.0,
+            "active_permits": [],
+            "supervisors_present": 2
+          },
+          {
+            "zone_id": "unit-2-zone-2",
+            "gas_ppm": 250.0,
+            "active_permits": [],
+            "supervisors_present": 2
+          },
+          {
+            "zone_id": "unit-2-zone-3",
+            "gas_ppm": 250.0,
+            "active_permits": [],
+            "supervisors_present": 2
+          }
+        ]
+      },
+      "engine_output": {
+        "risk_score": 30,
+        "flagged_zone": "",
+        "reasoning": "The unit's tool wear was recently resolved by a maintenance event, dropping from a critical value of 213.0 to 3.0. However, the tool wear has since risen relatively quickly to 25.0 within 30 minutes, which warrants close monitoring. All other parameters, including temperature and torque, remain stable under normal staffing conditions.",
+        "contributing_factors": []
+      },
+      "guardrail_result": {
+        "risk_score": 30,
+        "flagged_zone": "",
+        "reasoning": "The unit's tool wear was recently resolved by a maintenance event, dropping from a critical value of 213.0 to 3.0. However, the tool wear has since risen relatively quickly to 25.0 within 30 minutes, which warrants close monitoring. All other parameters, including temperature and torque, remain stable under normal staffing conditions.",
+        "contributing_factors": [],
+        "overridden": false,
+        "override_reason": null
+      }
+    }
+  }
+}
