@@ -4,7 +4,7 @@ from typing import Dict, List
 from app.services.correlation_service import get_risk_assessment, build_context
 
 router = APIRouter(
-    prefix="/api/risk-assessment",
+    prefix="/risk-assessment",
     tags=["Risk Assessment"]
 )
 
@@ -34,7 +34,6 @@ def trigger_batch_risk_assessment(payload: Dict):
     """
     Trigger a batch evaluation across your equipment array.
     """
-    # project structure utilizes a POST trigger format
     unit_id = payload.get("unit_id")
     if not unit_id:
         raise HTTPException(status_code=400, detail="Missing required key: 'unit_id'")

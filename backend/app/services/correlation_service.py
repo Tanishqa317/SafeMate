@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from pathlib import Path
 from typing import Dict, Optional
 import pandas as pd
@@ -19,6 +20,11 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data"
 COMBINED_CSV = DATA_DIR / "combined_dataset.csv"
+
+# --- Simple in-memory cache to avoid burning Gemini quota ---
+# Keyed by unit_id -> {"result": {...}, "cached_at": epoch_seconds}
+_RISK_CACHE: Dict[str, Dict] = {}
+CACHE_TTL_SECONDS = 1800  # 30 minutes — tune this up if quota is still tight
 
 
 def build_context(unit_id: str) -> Dict:
@@ -104,7 +110,6 @@ def call_gemini_for_risk_score(context: Dict) -> Dict:
 
         user_content = f"Analyze this plant unit data for risk: {json.dumps(context)}"
 
-        # Fixed syntax to map system instruction and generation configurations correctly
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
@@ -120,8 +125,7 @@ def call_gemini_for_risk_score(context: Dict) -> Dict:
         )
 
         response_text = response.text.strip()
-        
-        # Try to extract JSON if there's markdown wrapping
+
         if response_text.startswith("```"):
             response_text = response_text.split("```")[1]
             if response_text.startswith("json"):
@@ -154,16 +158,26 @@ def call_gemini_for_risk_score(context: Dict) -> Dict:
         }
 
 
-def get_risk_assessment(unit_id: str) -> Dict:
-    """Get full risk assessment for a unit.
-    
-    Combines build_context and call_gemini_for_risk_score.
-    Returns dict with unit_id, risk_score, risk_level, primary_concern, reasoning.
+def get_risk_assessment(unit_id: str, force_refresh: bool = False) -> Dict:
+    """Get full risk assessment for a unit, using a cached result when available.
+
+    This is the SINGLE choke point every route calls through (directly or
+    indirectly via cost-of-risk), so caching here protects the Gemini quota
+    no matter which endpoint triggered the request.
     """
+    now = time.time()
+    cached = _RISK_CACHE.get(unit_id)
+
+    if not force_refresh and cached is not None and (now - cached["cached_at"]) < CACHE_TTL_SECONDS:
+        result = dict(cached["result"])
+        result["cached"] = True
+        result["cache_age_seconds"] = int(now - cached["cached_at"])
+        return result
+
     context = build_context(unit_id)
     risk_data = call_gemini_for_risk_score(context)
-    
-    return {
+
+    result = {
         "unit_id": unit_id,
         "risk_score": risk_data.get("risk_score", 50),
         "risk_level": risk_data.get("risk_level", "error"),
@@ -171,3 +185,13 @@ def get_risk_assessment(unit_id: str) -> Dict:
         "reasoning": risk_data.get("reasoning", ""),
         "error": risk_data.get("error"),
     }
+
+    # Only cache successful calls — don't cache a rate-limit/error response,
+    # so the next request gets a real retry instead of caching the failure.
+    if not result.get("error"):
+        _RISK_CACHE[unit_id] = {"result": result, "cached_at": now}
+        result = dict(result)
+        result["cached"] = False
+        result["cache_age_seconds"] = 0
+
+    return result
